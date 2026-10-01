@@ -9,7 +9,8 @@ import {
   FolderOpen,
   ArrowRight,
   Sparkles,
-  Lock,
+  Cloud,
+  LogIn,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -31,18 +32,13 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
   const [loadingQuestions, setLoadingQuestions] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      loadHistory();
-    } else {
-      setLoading(false);
-    }
+    loadHistory();
   }, [user]);
 
   const loadHistory = async () => {
-    if (!user) return;
     setLoading(true);
     try {
-      const data = await fetchUserInterviews(user.uid);
+      const data = await fetchUserInterviews(user ? user.uid : undefined);
       setInterviews(data);
     } catch (err) {
       console.warn('Failed to load interviews:', err);
@@ -71,38 +67,43 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
     }
   };
 
-  if (!user) {
-    return (
-      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <div className="w-16 h-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
-          <Lock className="w-8 h-8" />
-        </div>
-        <h2 className="text-2xl font-bold text-on-surface mb-2">Cloud Storage Sign-In Required</h2>
-        <p className="text-xs text-on-surface-variant max-w-md mx-auto mb-6">
-          Sign in with your Google account to automatically persist your interview loops, questions, rubrics, and scores to Google Cloud Firestore.
-        </p>
-        <button
-          onClick={() => signInWithGoogle()}
-          className="m3-btn-primary px-6 py-2.5 text-xs font-bold inline-flex items-center gap-2 shadow-md"
-        >
-          <span>Sign In With Google</span>
-          <ArrowRight className="w-4 h-4" />
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6 animate-in fade-in duration-150">
+      {/* Guest Mode Banner */}
+      {!user && (
+        <div className="p-4 rounded-2xl bg-primary-container/40 border border-primary/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <Cloud className="w-5 h-5 text-primary shrink-0" />
+            <div className="text-xs">
+              <span className="font-bold text-on-surface block">Currently in Guest Mode</span>
+              <span className="text-on-surface-variant">
+                Your interview sessions are cached on this device. Sign in with Google to sync all data to Google Cloud Firestore permanently.
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={() => signInWithGoogle()}
+            className="m3-btn-primary px-4 py-2 text-xs font-semibold flex items-center gap-1.5 shrink-0 self-start sm:self-center shadow-sm"
+          >
+            <LogIn className="w-3.5 h-3.5" />
+            <span>Connect Google Cloud</span>
+          </button>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-outline-variant/40">
         <div>
           <div className="flex items-center gap-2 text-primary mb-1">
             <History className="w-5 h-5" />
-            <span className="text-xs font-bold uppercase tracking-wider">Cloud Storage</span>
+            <span className="text-xs font-bold uppercase tracking-wider">
+              {user ? 'Google Cloud Firestore' : 'Practice Archive'}
+            </span>
           </div>
           <h2 className="text-2xl font-bold text-on-surface">Mock Interview History</h2>
           <p className="text-xs text-on-surface-variant">
-            All your completed sessions synced securely to Google Cloud Firestore.
+            {user
+              ? 'All your completed sessions synced securely to Google Cloud Firestore.'
+              : 'Review your past mock interviews, answers, and scores.'}
           </p>
         </div>
 
@@ -110,8 +111,8 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
           <button
             onClick={loadHistory}
             disabled={loading}
-            className="p-2 rounded-full border border-outline-variant hover:bg-surface-container text-on-surface-variant"
-            title="Refresh from Cloud"
+            className="p-2 rounded-full border border-outline-variant hover:bg-surface-container text-on-surface-variant transition-colors"
+            title="Refresh list"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-primary' : ''}`} />
           </button>
@@ -128,7 +129,7 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
       {loading ? (
         <div className="py-20 text-center space-y-3">
           <div className="w-8 h-8 border-3 border-primary/20 border-t-primary rounded-full animate-spin mx-auto" />
-          <p className="text-xs text-on-surface-variant font-medium">Fetching sessions from Firestore...</p>
+          <p className="text-xs text-on-surface-variant font-medium">Fetching sessions...</p>
         </div>
       ) : interviews.length === 0 ? (
         <div className="m3-card p-12 text-center max-w-lg mx-auto space-y-4">
@@ -137,7 +138,7 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
           </div>
           <h3 className="text-base font-bold text-on-surface">No Mock Interviews Saved Yet</h3>
           <p className="text-xs text-on-surface-variant">
-            You haven't conducted any mock interviews yet. Pick a domain and start your first session to build your readiness radar.
+            You haven't conducted any mock interviews yet. Pick any field from the Practice Arena and start your first session.
           </p>
           <button
             onClick={onStartNew}
@@ -156,7 +157,7 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
             return (
               <div
                 key={session.interviewId}
-                className="m3-card overflow-hidden border border-outline-variant/60"
+                className="m3-card overflow-hidden border border-outline-variant/60 hover:border-primary/40 transition-all"
               >
                 <div
                   onClick={() => handleToggleExpand(session.interviewId)}
@@ -183,7 +184,7 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
                       {session.role}
                     </h4>
                     <p className="text-xs text-on-surface-variant line-clamp-1">
-                      {session.summaryFeedback || 'Completed evaluation loop.'}
+                      {session.summaryFeedback || 'Completed mock interview evaluation loop.'}
                     </p>
                   </div>
 
@@ -220,11 +221,11 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
 
                     {loadingQuestions && !questions.length ? (
                       <div className="py-6 text-center text-xs text-on-surface-variant">
-                        Loading detailed questions from Firestore...
+                        Loading questions and answers...
                       </div>
                     ) : questions.length === 0 ? (
                       <p className="text-xs text-on-surface-variant italic">
-                        No recorded question responses found for this session.
+                        No recorded questions found for this session.
                       </p>
                     ) : (
                       <div className="space-y-3">
@@ -239,7 +240,7 @@ export const CloudHistory: React.FC<CloudHistoryProps> = ({ onStartNew }) => {
                               </span>
                               {q.technicalScore !== undefined && (
                                 <span className="font-bold text-primary shrink-0 bg-primary/10 px-2 py-0.5 rounded-full">
-                                  {q.technicalScore}%
+                                  Score: {q.technicalScore}%
                                 </span>
                               )}
                             </div>

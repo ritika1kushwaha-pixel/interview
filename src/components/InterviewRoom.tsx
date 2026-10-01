@@ -17,6 +17,9 @@ import {
   CheckCircle2,
   AlertCircle,
   Lightbulb,
+  X,
+  Play,
+  Pause,
 } from 'lucide-react';
 import {
   EvaluationResult,
@@ -25,7 +28,11 @@ import {
 } from '../types/interview';
 import { EvaluationCard } from './EvaluationCard';
 import { requestAnswerEvaluation } from '../services/geminiClient';
-import { saveQuestionToCloud, updateInterviewInCloud, saveFeedbackBookmark } from '../services/firestoreService';
+import {
+  saveQuestionToCloud,
+  updateInterviewInCloud,
+  saveFeedbackBookmark,
+} from '../services/firestoreService';
 
 interface InterviewRoomProps {
   session: InterviewSession;
@@ -49,10 +56,12 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   // Audio / Speech-to-Text State
   const [isRecording, setIsRecording] = useState(false);
   const [speechSupported, setSpeechSupported] = useState(true);
+  const [speechError, setSpeechError] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
   // Video Preview State
   const [isVideoOn, setIsVideoOn] = useState(false);
+  const [videoError, setVideoError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -67,6 +76,9 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [currentEvaluation, setCurrentEvaluation] = useState<EvaluationResult | null>(null);
 
+  // Exit confirmation modal
+  const [showExitConfirm, setShowExitConfirm] = useState(false);
+
   const currentQ = questions[currentIndex] || questions[0];
 
   // Initialize Speech Recognition
@@ -75,38 +87,58 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 
     if (SpeechRecognition) {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'en-US';
 
-      recognition.onresult = (event: any) => {
-        let fullTranscript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          fullTranscript += event.results[i][0].transcript + ' ';
-        }
-        setCandidateAnswer(fullTranscript.trim());
-      };
+        recognition.onresult = (event: any) => {
+          let fullTranscript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            fullTranscript += event.results[i][0].transcript + ' ';
+          }
+          if (fullTranscript.trim()) {
+            setCandidateAnswer((prev) => {
+              // Smoothly merge or append
+              return fullTranscript.trim();
+            });
+            setSpeechError(null);
+          }
+        };
 
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
-        if (event.error === 'not-allowed') {
+        recognition.onerror = (event: any) => {
+          console.warn('Speech recognition event error:', event.error);
+          if (event.error === 'not-allowed') {
+            setSpeechError('Microphone permission blocked. Please allow microphone access or type directly.');
+            setIsRecording(false);
+          } else if (event.error === 'no-speech') {
+            // benign
+          } else {
+            setIsRecording(false);
+          }
+        };
+
+        recognition.onend = () => {
           setIsRecording(false);
-        }
-      };
+        };
 
-      recognition.onend = () => {
-        setIsRecording(false);
-      };
-
-      recognitionRef.current = recognition;
+        recognitionRef.current = recognition;
+      } catch (e) {
+        console.warn('Failed to construct SpeechRecognition:', e);
+        setSpeechSupported(false);
+      }
     } else {
       setSpeechSupported(false);
     }
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
       }
     };
   }, []);
@@ -129,35 +161,51 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
         streamRef.current.getTracks().forEach((track) => track.stop());
       }
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
+        try {
+          window.speechSynthesis.cancel();
+        } catch {
+          // ignore
+        }
       }
     };
   }, []);
 
-  // Automatically speak the question once when index changes
+  // When question index changes
   useEffect(() => {
     setCandidateAnswer(currentQ.userAnswer || '');
     setCurrentEvaluation(null);
     setSecondsElapsed(0);
     setIsTimerRunning(true);
-    speakQuestion(currentQ.questionText);
+    setSpeechError(null);
   }, [currentIndex]);
 
   const speakQuestion = (text: string) => {
     if (!('speechSynthesis' in window)) return;
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
-    utterance.onstart = () => setIsInterviewerSpeaking(true);
-    utterance.onend = () => setIsInterviewerSpeaking(false);
-    utterance.onerror = () => setIsInterviewerSpeaking(false);
-    window.speechSynthesis.speak(utterance);
+    try {
+      window.speechSynthesis.cancel();
+      if (window.speechSynthesis.paused) {
+        window.speechSynthesis.resume();
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.onstart = () => setIsInterviewerSpeaking(true);
+      utterance.onend = () => setIsInterviewerSpeaking(false);
+      utterance.onerror = () => setIsInterviewerSpeaking(false);
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn('TTS error:', err);
+      setIsInterviewerSpeaking(false);
+    }
   };
 
   const toggleInterviewerVoice = () => {
     if (isInterviewerSpeaking) {
-      window.speechSynthesis.cancel();
+      try {
+        window.speechSynthesis.cancel();
+      } catch {
+        // ignore
+      }
       setIsInterviewerSpeaking(false);
     } else {
       speakQuestion(currentQ.questionText);
@@ -165,22 +213,34 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   };
 
   const toggleSpeechRecording = () => {
-    if (!speechSupported || !recognitionRef.current) return;
+    if (!speechSupported || !recognitionRef.current) {
+      setSpeechError('Speech recognition is not supported in this browser. Please type your answer.');
+      return;
+    }
+
+    setSpeechError(null);
 
     if (isRecording) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
       setIsRecording(false);
     } else {
       try {
         recognitionRef.current.start();
         setIsRecording(true);
-      } catch (err) {
-        console.warn('Speech recognition start failed', err);
+      } catch (err: any) {
+        console.warn('Speech recognition start failed:', err);
+        // If already started, toggle off
+        setIsRecording(false);
       }
     }
   };
 
   const toggleVideo = async () => {
+    setVideoError(null);
     if (isVideoOn) {
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((track) => track.stop());
@@ -195,8 +255,10 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
           videoRef.current.srcObject = stream;
         }
         setIsVideoOn(true);
-      } catch (err) {
-        console.warn('Camera access denied or unavailable', err);
+      } catch (err: any) {
+        console.warn('Camera access denied or unavailable:', err);
+        setVideoError('Camera access unavailable or blocked. Please check browser camera permissions.');
+        setIsVideoOn(false);
       }
     }
   };
@@ -208,11 +270,23 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
     }
   }, [isVideoOn]);
 
+  const insertSampleAnswer = () => {
+    const sample = currentQ.modelAnswer
+      ? `In my previous role, I addressed this directly. First, I established the baseline metrics and aligned key stakeholders around our primary SLA goals. Next, I designed a partitioned architecture with automated failover and telemetry alerting. As a direct result, we improved throughput by 42% and reduced incident response times to zero P0 outages.`
+      : `To solve this challenge, I evaluated the trade-offs between speed and consistency. I implemented a modular solution with idempotent processing, which resulted in a 35% reduction in latency and saved 12 engineering hours per week.`;
+
+    setCandidateAnswer(sample);
+  };
+
   const handleSubmitAnswer = async () => {
     if (!candidateAnswer.trim() || isEvaluating) return;
 
     if (isRecording && recognitionRef.current) {
-      recognitionRef.current.stop();
+      try {
+        recognitionRef.current.stop();
+      } catch {
+        // ignore
+      }
       setIsRecording(false);
     }
 
@@ -251,7 +325,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
       nextQuestions[currentIndex] = updatedQuestion;
       setQuestions(nextQuestions);
 
-      // Persist question to Cloud Firestore
+      // Persist question
       await saveQuestionToCloud(session.interviewId, updatedQuestion);
     } catch (err) {
       console.error('Error submitting answer:', err);
@@ -286,13 +360,13 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
       const evaluated = questions.filter((q) => q.status === 'evaluated' && q.technicalScore !== undefined);
       const avgTech = evaluated.length
         ? Math.round(evaluated.reduce((acc, q) => acc + (q.technicalScore || 0), 0) / evaluated.length)
-        : 70;
+        : 75;
       const avgComm = evaluated.length
         ? Math.round(evaluated.reduce((acc, q) => acc + (q.communicationScore || 0), 0) / evaluated.length)
-        : 70;
+        : 75;
       const avgConf = evaluated.length
         ? Math.round(evaluated.reduce((acc, q) => acc + (q.confidenceScore || 0), 0) / evaluated.length)
-        : 70;
+        : 75;
       const overall = Math.round((avgTech * 0.4) + (avgComm * 0.35) + (avgConf * 0.25));
 
       const completedSession: InterviewSession = {
@@ -302,7 +376,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
         technicalScore: avgTech,
         communicationScore: avgComm,
         confidenceScore: avgConf,
-        summaryFeedback: `Candidate completed ${evaluated.length} evaluated questions with strong competence in ${session.role}.`,
+        summaryFeedback: `Candidate completed ${evaluated.length} questions demonstrating clear competency for ${session.role}.`,
         updatedAt: new Date().toISOString(),
       };
 
@@ -339,7 +413,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
   };
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 space-y-6 animate-in fade-in duration-150">
       {/* Top Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-outline-variant/40">
         <div>
@@ -347,7 +421,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
             <span className="text-xs font-bold uppercase tracking-wider text-primary">
               Question {currentIndex + 1} of {questions.length}
             </span>
-            <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-container text-on-surface-variant border border-outline-variant/50">
+            <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant border border-outline-variant/50">
               {currentQ.category}
             </span>
           </div>
@@ -371,7 +445,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
           >
             <Clock className="w-3.5 h-3.5" />
             <span>{formatTimer(secondsElapsed)}</span>
-            <span className="text-[10px] font-sans font-normal opacity-75">(Rec: 2-3m)</span>
+            <span className="text-[10px] font-sans font-normal opacity-75 hidden sm:inline">(Rec: 2-3m)</span>
           </div>
 
           {/* Video Toggle */}
@@ -389,17 +463,27 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
 
           {/* Exit Button */}
           <button
-            onClick={onExit}
+            onClick={() => setShowExitConfirm(true)}
             className="px-3 py-1.5 rounded-full text-xs font-semibold text-on-surface-variant hover:bg-surface-container border border-outline-variant/40"
           >
-            Leave
+            Exit
           </button>
         </div>
       </div>
 
+      {/* Camera Alert if any */}
+      {videoError && (
+        <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between">
+          <span>{videoError}</span>
+          <button onClick={() => setVideoError(null)} className="p-1 text-on-surface-variant hover:text-on-surface">
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Video Self-Check Mirror Preview (if enabled) */}
       {isVideoOn && (
-        <div className="relative w-48 h-32 sm:w-60 sm:h-40 rounded-2xl overflow-hidden border-2 border-primary shadow-lg bg-black mx-auto sm:ml-auto">
+        <div className="relative w-52 h-36 sm:w-64 sm:h-44 rounded-2xl overflow-hidden border-2 border-primary shadow-xl bg-black mx-auto sm:ml-auto">
           <video
             ref={videoRef}
             autoPlay
@@ -408,7 +492,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
             className="w-full h-full object-cover scale-x-[-1]"
           />
           <span className="absolute bottom-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-black/70 text-white backdrop-blur-sm">
-            Eye Contact & Posture
+            Mirror Feed Active
           </span>
         </div>
       )}
@@ -438,7 +522,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
               </span>
               <button
                 onClick={toggleInterviewerVoice}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline-variant/40"
+                className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-surface-container text-on-surface-variant hover:text-on-surface border border-outline-variant/40 transition-colors"
               >
                 {isInterviewerSpeaking ? (
                   <>
@@ -448,7 +532,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
                 ) : (
                   <>
                     <Volume2 className="w-3.5 h-3.5" />
-                    <span>Listen</span>
+                    <span>Play Audio</span>
                   </>
                 )}
               </button>
@@ -473,7 +557,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
         /* Candidate Answer Workspace */
         <div className="m3-card p-6 space-y-4">
           {/* Workspace Tabs: Answer, STAR Coach, Scratchpad */}
-          <div className="flex items-center justify-between border-b border-outline-variant/40 pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-outline-variant/40 pb-2">
             <div className="flex items-center gap-1">
               <button
                 onClick={() => setActiveTab('answer')}
@@ -511,20 +595,39 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
             </div>
 
             {/* Voice Dictation Status */}
-            {speechSupported && (
+            <div className="flex items-center gap-2">
               <button
-                onClick={toggleSpeechRecording}
-                className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition-all ${
-                  isRecording
-                    ? 'bg-red-500 text-white border-red-600 animate-pulse shadow-md shadow-red-500/20'
-                    : 'bg-surface-container text-primary border-outline-variant hover:bg-primary-container/40'
-                }`}
+                onClick={insertSampleAnswer}
+                className="px-2.5 py-1 rounded-full text-xs font-medium text-primary hover:bg-primary-container/30 border border-primary/30 transition-colors"
+                title="Paste a sample answer to test evaluation quickly"
               >
-                {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
-                <span>{isRecording ? 'Listening (Speaking...)' : 'Speak Answer'}</span>
+                + Try Sample Answer
               </button>
-            )}
+              {speechSupported && (
+                <button
+                  onClick={toggleSpeechRecording}
+                  className={`px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 border transition-all ${
+                    isRecording
+                      ? 'bg-red-500 text-white border-red-600 animate-pulse shadow-md shadow-red-500/20'
+                      : 'bg-surface-container text-primary border-outline-variant hover:bg-primary-container/40'
+                  }`}
+                >
+                  {isRecording ? <MicOff className="w-3.5 h-3.5" /> : <Mic className="w-3.5 h-3.5" />}
+                  <span>{isRecording ? 'Listening (Speak now)' : 'Speak Answer'}</span>
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Speech Error Banner if any */}
+          {speechError && (
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-xs text-amber-800 dark:text-amber-200 flex items-center justify-between">
+              <span>{speechError}</span>
+              <button onClick={() => setSpeechError(null)} className="p-1 text-on-surface-variant hover:text-on-surface">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* TAB 1: Answer Editor */}
           {activeTab === 'answer' && (
@@ -541,8 +644,8 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
                   Word count: {candidateAnswer.trim().split(/\s+/).filter(Boolean).length} words
                 </span>
                 <span className="italic">
-                  {candidateAnswer.trim().split(/\s+/).filter(Boolean).length < 50
-                    ? 'Tip: Provide sufficient depth (50-200 words) for a thorough evaluation.'
+                  {candidateAnswer.trim().split(/\s+/).filter(Boolean).length < 25
+                    ? 'Tip: Provide sufficient detail for a comprehensive evaluation score.'
                     : 'Great length. Ready for precision AI review.'}
                 </span>
               </div>
@@ -618,7 +721,7 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
             <button
               onClick={handleSubmitAnswer}
               disabled={!candidateAnswer.trim() || isEvaluating}
-              className="m3-btn-primary px-6 py-2.5 text-xs font-bold flex items-center gap-2 shadow-md disabled:opacity-50 hover:scale-[1.02]"
+              className="m3-btn-primary px-6 py-2.5 text-xs font-bold flex items-center gap-2 shadow-md disabled:opacity-50 hover:scale-[1.02] cursor-pointer"
             >
               {isEvaluating ? (
                 <>
@@ -632,6 +735,38 @@ export const InterviewRoom: React.FC<InterviewRoomProps> = ({
                 </>
               )}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Exit Confirmation Modal */}
+      {showExitConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-150">
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-3xl max-w-sm w-full p-6 shadow-2xl text-center space-y-4">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <h3 className="text-base font-bold text-on-surface">Leave Interview Session?</h3>
+            <p className="text-xs text-on-surface-variant">
+              Your answered questions and progress will remain saved in your history. You can return anytime.
+            </p>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <button
+                onClick={() => setShowExitConfirm(false)}
+                className="px-4 py-2 rounded-full text-xs font-semibold text-on-surface-variant hover:bg-surface-container"
+              >
+                Resume
+              </button>
+              <button
+                onClick={() => {
+                  setShowExitConfirm(false);
+                  onExit();
+                }}
+                className="px-5 py-2 rounded-full text-xs font-bold bg-red-600 text-white hover:bg-red-700 shadow-sm"
+              >
+                Leave Session
+              </button>
+            </div>
           </div>
         </div>
       )}

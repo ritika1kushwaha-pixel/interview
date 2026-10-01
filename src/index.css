@@ -1,10 +1,45 @@
 @import "tailwindcss";
 
+@theme {
+  --color-primary: var(--md-primary);
+  --color-on-primary: var(--md-on-primary);
+  --color-primary-container: var(--md-primary-container);
+  --color-on-primary-container: var(--md-on-primary-container);
+
+  --color-secondary: var(--md-secondary);
+  --color-on-secondary: var(--md-on-secondary);
+  --color-secondary-container: var(--md-secondary-container);
+  --color-on-secondary-container: var(--md-on-secondary-container);
+
+  --color-tertiary: var(--md-tertiary);
+  --color-on-tertiary: var(--md-on-tertiary);
+  --color-tertiary-container: var(--md-tertiary-container);
+  --color-on-tertiary-container: var(--md-on-tertiary-container);
+
+  --color-error: var(--md-error);
+  --color-error-container: var(--md-error-container);
+  --color-on-error: var(--md-on-error);
+
+  --color-surface: var(--md-surface);
+  --color-surface-dim: var(--md-surface-dim);
+  --color-surface-bright: var(--md-surface-bright);
+  --color-surface-container-lowest: var(--md-surface-container-lowest);
+  --color-surface-container-low: var(--md-surface-container-low);
+  --color-surface-container: var(--md-surface-container);
+  --color-surface-container-high: var(--md-surface-container-high);
+  --color-surface-container-highest: var(--md-surface-container-highest);
+
+  --color-on-surface: var(--md-on-surface);
+  --color-on-surface-variant: var(--md-on-surface-variant);
+  --color-outline: var(--md-outline);
+  --color-outline-variant: var(--md-outline-variant);
+
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Roboto Mono', monospace;
+}
+
 @layer base {
   :root {
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-mono: 'Roboto Mono', monospace;
-
     /* Material 3 Light Palette */
     --md-primary: #5944d1;
     --md-on-primary: #ffffff;
@@ -42,9 +77,9 @@
 
   .dark {
     /* Material 3 Dark Palette */
-    --md-primary: #c9bfff;
-    --md-on-primary: #2908a2;
-    --md-primary-container: #4128ba;
+    --md-primary: #8e7aff;
+    --md-on-primary: #12005b;
+    --md-primary-container: #3d2899;
     --md-on-primary-container: #e6deff;
 
     --md-secondary: #82d3e0;
@@ -61,19 +96,19 @@
     --md-error-container: #93000a;
     --md-on-error: #690005;
 
-    --md-surface: #141218;
-    --md-surface-dim: #141218;
-    --md-surface-bright: #3b383e;
-    --md-surface-container-lowest: #0f0d13;
-    --md-surface-container-low: #1d1b20;
-    --md-surface-container: #211f24;
-    --md-surface-container-high: #2b292f;
-    --md-surface-container-highest: #36343a;
+    --md-surface: #121016;
+    --md-surface-dim: #121016;
+    --md-surface-bright: #36343c;
+    --md-surface-container-lowest: #0c0b0f;
+    --md-surface-container-low: #1a1820;
+    --md-surface-container: #201e26;
+    --md-surface-container-high: #2a2832;
+    --md-surface-container-highest: #35333d;
 
-    --md-on-surface: #e6e1e5;
-    --md-on-surface-variant: #cac4d0;
-    --md-outline: #948f99;
-    --md-outline-variant: #49454f;
+    --md-on-surface: #e8e4ed;
+    --md-on-surface-variant: #ccc7d2;
+    --md-outline: #96909c;
+    --md-outline-variant: #4a4652;
   }
 
   body {
@@ -109,6 +144,7 @@
   border-radius: 9999px;
   font-weight: 600;
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  cursor: pointer;
 }
 
 .m3-btn-primary:hover:not(:disabled) {
@@ -122,6 +158,7 @@
   border-radius: 9999px;
   font-weight: 600;
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  cursor: pointer;
 }
 
 .m3-btn-tonal:hover:not(:disabled) {
@@ -134,6 +171,7 @@
   border-radius: 9999px;
   font-weight: 500;
   transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  cursor: pointer;
 }
 
 .m3-btn-outlined:hover:not(:disabled) {
@@ -144,21 +182,44 @@
   display: inline-flex;
   align-items: center;
   gap: 0.375rem;
-  padding: 0.375rem 0.875rem;
-  border-radius: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.75rem;
   font-size: 0.8125rem;
   font-weight: 500;
   border: 1px solid var(--md-outline-variant);
   background-color: var(--md-surface-container-low);
   color: var(--md-on-surface);
   transition: all 0.15s ease;
+  cursor: pointer;
+}
+
+.m3-chip:hover {
+  border-color: var(--md-primary);
+  background-color: var(--md-surface-container);
 }
 
 .m3-chip-selected {
   background-color: var(--md-primary-container);
   color: var(--md-on-primary-container);
   border-color: var(--md-primary);
-  font-weight: 600;
+  font-weight: 700;
+  box-shadow: 0 0 0 1px var(--md-primary);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--md-outline-variant);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--md-outline);
 }
 
 /* Audio wave animation */

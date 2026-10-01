@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
   Award,
@@ -8,19 +8,54 @@ import {
   ShieldCheck,
   Zap,
   Sparkles,
+  ArrowRight,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { fetchUserInterviews } from '../services/firestoreService';
+import { InterviewSession } from '../types/interview';
 
 export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
   onStartPractice,
 }) => {
   const { user, userProfile } = useAuth();
+  const [sessions, setSessions] = useState<InterviewSession[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const total = userProfile?.totalInterviews || 0;
-  const avgScore = userProfile?.averageScore || 0;
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const data = await fetchUserInterviews(user ? user.uid : undefined);
+      setSessions(data.filter((s) => s.status === 'completed'));
+    } catch (err) {
+      console.warn('Failed to load sessions for analytics:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const total = sessions.length || userProfile?.totalInterviews || 0;
+  const avgScore = sessions.length
+    ? Math.round(sessions.reduce((acc, s) => acc + (s.overallScore || 0), 0) / sessions.length)
+    : userProfile?.averageScore || 0;
+
+  const avgTech = sessions.length
+    ? Math.round(sessions.reduce((acc, s) => acc + (s.technicalScore || 0), 0) / sessions.length)
+    : total > 0 ? avgScore + 2 : 75;
+
+  const avgComm = sessions.length
+    ? Math.round(sessions.reduce((acc, s) => acc + (s.communicationScore || 0), 0) / sessions.length)
+    : total > 0 ? avgScore - 1 : 70;
+
+  const avgConf = sessions.length
+    ? Math.round(sessions.reduce((acc, s) => acc + (s.confidenceScore || 0), 0) / sessions.length)
+    : total > 0 ? avgScore - 3 : 72;
 
   return (
-    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 space-y-6 animate-in fade-in duration-150">
       {/* Header */}
       <div className="pb-4 border-b border-outline-variant/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -36,9 +71,10 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
 
         <button
           onClick={onStartPractice}
-          className="m3-btn-primary px-5 py-2 text-xs font-bold self-start sm:self-center shadow-sm"
+          className="m3-btn-primary px-5 py-2 text-xs font-bold self-start sm:self-center shadow-sm flex items-center gap-1.5"
         >
-          Start Practice Session
+          <span>Start Practice Session</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
@@ -56,7 +92,7 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
               {total > 0 ? `${avgScore}%` : '—'}
             </div>
             <span className="text-[11px] text-primary font-medium">
-              {total > 0 ? 'Across all mock questions' : 'Complete 1 session to unlock'}
+              {total > 0 ? `Across ${total} completed sessions` : 'Complete 1 session to unlock'}
             </span>
           </div>
         </div>
@@ -70,7 +106,9 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
               Sessions Completed
             </span>
             <div className="text-3xl font-black text-on-surface mt-0.5">{total}</div>
-            <span className="text-[11px] text-secondary font-medium">Cloud synced</span>
+            <span className="text-[11px] text-secondary font-medium">
+              {user ? 'Cloud Firestore synced' : 'Local practice cache'}
+            </span>
           </div>
         </div>
 
@@ -83,10 +121,10 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
               Target Level
             </span>
             <div className="text-xl font-black text-on-surface mt-1 truncate">
-              {userProfile?.seniority || 'Mid-Level'}
+              {userProfile?.seniority || (sessions[0]?.seniority) || 'Mid-Level'}
             </div>
             <span className="text-[11px] text-on-surface-variant truncate block">
-              {userProfile?.targetRole || 'Full Stack Engineer'}
+              {userProfile?.targetRole || (sessions[0]?.role) || 'Full Stack Engineer'}
             </span>
           </div>
         </div>
@@ -104,12 +142,12 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-on-surface">1. Technical Knowledge & Correctness</span>
-              <span className="font-bold text-primary">{total > 0 ? `${Math.min(95, avgScore + 2)}%` : '75% baseline'}</span>
+              <span className="font-bold text-primary">{Math.min(98, avgTech)}%</span>
             </div>
             <div className="w-full h-3 rounded-full bg-surface-container-high overflow-hidden">
               <div
                 className="h-full rounded-full bg-primary transition-all duration-700"
-                style={{ width: `${total > 0 ? Math.min(95, avgScore + 2) : 75}%` }}
+                style={{ width: `${Math.min(98, avgTech)}%` }}
               />
             </div>
             <p className="text-[11px] text-on-surface-variant">
@@ -121,12 +159,12 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-on-surface">2. Communication & STAR Methodology</span>
-              <span className="font-bold text-[#00897b]">{total > 0 ? `${Math.min(92, avgScore - 1)}%` : '70% baseline'}</span>
+              <span className="font-bold text-[#00897b]">{Math.min(98, avgComm)}%</span>
             </div>
             <div className="w-full h-3 rounded-full bg-surface-container-high overflow-hidden">
               <div
                 className="h-full rounded-full bg-[#00897b] transition-all duration-700"
-                style={{ width: `${total > 0 ? Math.min(92, avgScore - 1) : 70}%` }}
+                style={{ width: `${Math.min(98, avgComm)}%` }}
               />
             </div>
             <p className="text-[11px] text-on-surface-variant">
@@ -138,12 +176,12 @@ export const AnalyticsDashboard: React.FC<{ onStartPractice: () => void }> = ({
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="font-bold text-on-surface">3. Strategic Impact & Executive Presence</span>
-              <span className="font-bold text-[#825500]">{total > 0 ? `${Math.min(90, avgScore - 3)}%` : '72% baseline'}</span>
+              <span className="font-bold text-[#825500]">{Math.min(98, avgConf)}%</span>
             </div>
             <div className="w-full h-3 rounded-full bg-surface-container-high overflow-hidden">
               <div
                 className="h-full rounded-full bg-[#825500] transition-all duration-700"
-                style={{ width: `${total > 0 ? Math.min(90, avgScore - 3) : 72}%` }}
+                style={{ width: `${Math.min(98, avgConf)}%` }}
               />
             </div>
             <p className="text-[11px] text-on-surface-variant">
