@@ -1,0 +1,6 @@
+{
+  "name": "AceMock - AI Precision Interview Coach",
+  "description": "Interactive AI mock interview platform across tech, business, finance, and healthcare with real-time speech, Material 3 design, precision evaluation, and cloud progress tracking.",
+  "requestFramePermissions": ["microphone", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

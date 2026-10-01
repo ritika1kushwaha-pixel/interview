@@ -1,0 +1,199 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all access unless explicitly authorized
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helper Functions ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // --- Validation Helpers ---
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['userId', 'email', 'createdAt', 'updatedAt']) &&
+        data.userId == request.auth.uid &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.email is string && data.email.size() <= 128 &&
+        (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 128)) &&
+        (!('targetRole' in data) || (data.targetRole is string && data.targetRole.size() <= 100)) &&
+        (!('targetDomain' in data) || (data.targetDomain is string && data.targetDomain.size() <= 64)) &&
+        (!('seniority' in data) || (data.seniority is string && data.seniority.size() <= 50)) &&
+        (!('totalInterviews' in data) || (data.totalInterviews is number && data.totalInterviews >= 0)) &&
+        (!('averageScore' in data) || (data.averageScore is number && data.averageScore >= 0 && data.averageScore <= 100));
+    }
+
+    function isValidInterview(data) {
+      return data.keys().hasAll(['interviewId', 'userId', 'title', 'domain', 'role', 'status', 'createdAt', 'updatedAt']) &&
+        data.interviewId is string && data.interviewId.size() <= 128 &&
+        data.userId == request.auth.uid &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.title is string && data.title.size() <= 150 &&
+        data.domain is string && data.domain.size() <= 64 &&
+        data.role is string && data.role.size() <= 100 &&
+        (!('seniority' in data) || (data.seniority is string && data.seniority.size() <= 50)) &&
+        (!('difficulty' in data) || (data.difficulty is string && data.difficulty.size() <= 50)) &&
+        (!('interviewType' in data) || (data.interviewType is string && data.interviewType.size() <= 60)) &&
+        data.status is string && (data.status == 'in_progress' || data.status == 'completed' || data.status == 'abandoned') &&
+        (!('currentQuestionIndex' in data) || (data.currentQuestionIndex is number && data.currentQuestionIndex >= 0)) &&
+        (!('totalQuestions' in data) || (data.totalQuestions is number && data.totalQuestions >= 0 && data.totalQuestions <= 50)) &&
+        (!('overallScore' in data) || (data.overallScore is number && data.overallScore >= 0 && data.overallScore <= 100)) &&
+        (!('technicalScore' in data) || (data.technicalScore is number && data.technicalScore >= 0 && data.technicalScore <= 100)) &&
+        (!('communicationScore' in data) || (data.communicationScore is number && data.communicationScore >= 0 && data.communicationScore <= 100)) &&
+        (!('confidenceScore' in data) || (data.confidenceScore is number && data.confidenceScore >= 0 && data.confidenceScore <= 100)) &&
+        (!('summaryFeedback' in data) || (data.summaryFeedback is string && data.summaryFeedback.size() <= 5000));
+    }
+
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['questionId', 'interviewId', 'userId', 'order', 'questionText', 'status', 'createdAt', 'updatedAt']) &&
+        data.questionId is string && data.questionId.size() <= 128 &&
+        data.interviewId is string && data.interviewId.size() <= 128 &&
+        data.userId == request.auth.uid &&
+        data.userId is string && data.userId.size() <= 128 &&
+        data.order is number && data.order >= 0 && data.order <= 100 &&
+        data.questionText is string && data.questionText.size() <= 1000 &&
+        data.status is string && (data.status == 'pending' || data.status == 'answered' || data.status == 'evaluated' || data.status == 'skipped') &&
+        (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
+        (!('userAnswer' in data) || (data.userAnswer is string && data.userAnswer.size() <= 15000)) &&
+        (!('audioDurationSeconds' in data) || (data.audioDurationSeconds is number && data.audioDurationSeconds >= 0)) &&
+        (!('technicalScore' in data) || (data.technicalScore is number && data.technicalScore >= 0 && data.technicalScore <= 100)) &&
+        (!('communicationScore' in data) || (data.communicationScore is number && data.communicationScore >= 0 && data.communicationScore <= 100)) &&
+        (!('confidenceScore' in data) || (data.confidenceScore is number && data.confidenceScore >= 0 && data.confidenceScore <= 100)) &&
+        (!('strengths' in data) || (data.strengths is list && data.strengths.size() <= 10)) &&
+        (!('improvements' in data) || (data.improvements is list && data.improvements.size() <= 10)) &&
+        (!('modelAnswer' in data) || (data.modelAnswer is string && data.modelAnswer.size() <= 10000)) &&
+        (!('followUpQuestion' in data) || (data.followUpQuestion is string && data.followUpQuestion.size() <= 1000));
+    }
+
+    function isValidSavedFeedback(data) {
+      return data.keys().hasAll(['feedbackId', 'userId', 'questionText', 'keyTakeaway', 'createdAt', 'updatedAt']) &&
+        data.feedbackId is string && data.feedbackId.size() <= 128 &&
+        data.userId == request.auth.uid &&
+        data.userId is string && data.userId.size() <= 128 &&
+        (!('interviewId' in data) || (data.interviewId is string && data.interviewId.size() <= 128)) &&
+        data.questionText is string && data.questionText.size() <= 1000 &&
+        data.keyTakeaway is string && data.keyTakeaway.size() <= 3000 &&
+        (!('domain' in data) || (data.domain is string && data.domain.size() <= 64)) &&
+        (!('category' in data) || (data.category is string && data.category.size() <= 100)) &&
+        (!('modelAnswer' in data) || (data.modelAnswer is string && data.modelAnswer.size() <= 8000));
+    }
+
+    // --- Collections ---
+
+    // 1. User Profiles
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId) && isValidId(userId);
+    }
+
+    // 2. Interviews
+    match /interviews/{interviewId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        isValidId(interviewId) &&
+        isValidInterview(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(interviewId) &&
+        existing().userId == request.auth.uid &&
+        isValidInterview(incoming()) &&
+        incoming().interviewId == existing().interviewId &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+      allow delete: if isSignedIn() &&
+        isValidId(interviewId) &&
+        existing().userId == request.auth.uid;
+
+      // Subcollection: Questions (Master Gate derived from parent session)
+      match /questions/{questionId} {
+        allow get: if isSignedIn() &&
+          get(/databases/$(database)/documents/interviews/$(interviewId)).data.userId == request.auth.uid;
+        allow list: if isSignedIn() &&
+          get(/databases/$(database)/documents/interviews/$(interviewId)).data.userId == request.auth.uid &&
+          resource.data.userId == request.auth.uid;
+        allow create: if isSignedIn() &&
+          isValidId(interviewId) &&
+          isValidId(questionId) &&
+          get(/databases/$(database)/documents/interviews/$(interviewId)).data.userId == request.auth.uid &&
+          isValidQuestion(incoming()) &&
+          incoming().interviewId == interviewId &&
+          incoming().createdAt == request.time &&
+          incoming().updatedAt == request.time;
+        allow update: if isSignedIn() &&
+          isValidId(interviewId) &&
+          isValidId(questionId) &&
+          get(/databases/$(database)/documents/interviews/$(interviewId)).data.userId == request.auth.uid &&
+          existing().userId == request.auth.uid &&
+          isValidQuestion(incoming()) &&
+          incoming().questionId == existing().questionId &&
+          incoming().interviewId == existing().interviewId &&
+          incoming().userId == existing().userId &&
+          incoming().createdAt == existing().createdAt &&
+          incoming().updatedAt == request.time;
+        allow delete: if isSignedIn() &&
+          isValidId(interviewId) &&
+          isValidId(questionId) &&
+          get(/databases/$(database)/documents/interviews/$(interviewId)).data.userId == request.auth.uid &&
+          existing().userId == request.auth.uid;
+      }
+    }
+
+    // 3. Saved Coaching Feedback / Flashcards
+    match /saved_feedback/{feedbackId} {
+      allow get: if isSignedIn() && existing().userId == request.auth.uid;
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() &&
+        isValidId(feedbackId) &&
+        isValidSavedFeedback(incoming()) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+      allow update: if isSignedIn() &&
+        isValidId(feedbackId) &&
+        existing().userId == request.auth.uid &&
+        isValidSavedFeedback(incoming()) &&
+        incoming().feedbackId == existing().feedbackId &&
+        incoming().userId == existing().userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time;
+      allow delete: if isSignedIn() &&
+        isValidId(feedbackId) &&
+        existing().userId == request.auth.uid;
+    }
+  }
+}

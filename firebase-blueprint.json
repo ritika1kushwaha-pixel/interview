@@ -1,0 +1,321 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with interview preferences and cumulative readiness statistics",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Unique identifier of the authenticated user",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 128
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name",
+          "maxLength": 128
+        },
+        "targetRole": {
+          "type": "string",
+          "description": "Primary job role being targeted",
+          "maxLength": 100
+        },
+        "targetDomain": {
+          "type": "string",
+          "description": "Field or industry category",
+          "maxLength": 64
+        },
+        "seniority": {
+          "type": "string",
+          "description": "Experience level targeted",
+          "enum": ["Entry-Level", "Mid-Level", "Senior", "Lead / Staff", "Executive"]
+        },
+        "totalInterviews": {
+          "type": "number",
+          "description": "Total completed mock interviews"
+        },
+        "averageScore": {
+          "type": "number",
+          "description": "Average composite score across all completed interviews"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when profile was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when profile was last updated"
+        }
+      },
+      "required": ["userId", "email", "createdAt", "updatedAt"]
+    },
+    "InterviewSession": {
+      "title": "InterviewSession",
+      "description": "A structured mock interview session record",
+      "type": "object",
+      "properties": {
+        "interviewId": {
+          "type": "string",
+          "description": "Unique identifier of the interview session",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "UID of the candidate user",
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the interview session",
+          "maxLength": 150
+        },
+        "domain": {
+          "type": "string",
+          "description": "Field / industry domain",
+          "maxLength": 64
+        },
+        "role": {
+          "type": "string",
+          "description": "Specific job role",
+          "maxLength": 100
+        },
+        "seniority": {
+          "type": "string",
+          "description": "Seniority tier for the questions",
+          "maxLength": 50
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "Interviewer difficulty style",
+          "enum": ["Friendly", "Standard", "Challenging", "Brutal FAANG"]
+        },
+        "interviewType": {
+          "type": "string",
+          "description": "Type of interview",
+          "enum": ["Technical & Knowledge", "Behavioral & STAR", "System Design & Architecture", "Case Study & Strategy", "Comprehensive Hybrid"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Session progress state",
+          "enum": ["in_progress", "completed", "abandoned"]
+        },
+        "currentQuestionIndex": {
+          "type": "number",
+          "description": "Index of active question"
+        },
+        "totalQuestions": {
+          "type": "number",
+          "description": "Total questions prepared for this session"
+        },
+        "overallScore": {
+          "type": "number",
+          "description": "Final or current aggregate score percentage"
+        },
+        "technicalScore": {
+          "type": "number",
+          "description": "Technical knowledge score component"
+        },
+        "communicationScore": {
+          "type": "number",
+          "description": "Communication clarity and structure score"
+        },
+        "confidenceScore": {
+          "type": "number",
+          "description": "Confidence and business impact score"
+        },
+        "summaryFeedback": {
+          "type": "string",
+          "description": "Executive summary of interview performance",
+          "maxLength": 5000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Session start timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Session update timestamp"
+        }
+      },
+      "required": ["interviewId", "userId", "title", "domain", "role", "status", "createdAt", "updatedAt"]
+    },
+    "InterviewQuestion": {
+      "title": "InterviewQuestion",
+      "description": "Individual interview question, candidate response, and precision AI evaluation",
+      "type": "object",
+      "properties": {
+        "questionId": {
+          "type": "string",
+          "description": "Question ID",
+          "maxLength": 128
+        },
+        "interviewId": {
+          "type": "string",
+          "description": "Parent interview session ID",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner candidate UID",
+          "maxLength": 128
+        },
+        "order": {
+          "type": "number",
+          "description": "Order index within session"
+        },
+        "questionText": {
+          "type": "string",
+          "description": "The mock question asked by interviewer",
+          "maxLength": 1000
+        },
+        "category": {
+          "type": "string",
+          "description": "Question category or competency tested",
+          "maxLength": 100
+        },
+        "userAnswer": {
+          "type": "string",
+          "description": "Candidate transcript or written response",
+          "maxLength": 15000
+        },
+        "audioDurationSeconds": {
+          "type": "number",
+          "description": "Duration spoken in seconds"
+        },
+        "status": {
+          "type": "string",
+          "description": "Evaluation state",
+          "enum": ["pending", "answered", "evaluated", "skipped"]
+        },
+        "technicalScore": {
+          "type": "number",
+          "description": "Technical score (0-100)"
+        },
+        "communicationScore": {
+          "type": "number",
+          "description": "Communication score (0-100)"
+        },
+        "confidenceScore": {
+          "type": "number",
+          "description": "Confidence and impact score (0-100)"
+        },
+        "strengths": {
+          "type": "array",
+          "description": "What candidate executed well",
+          "maxLength": 10
+        },
+        "improvements": {
+          "type": "array",
+          "description": "Actionable areas for growth",
+          "maxLength": 10
+        },
+        "modelAnswer": {
+          "type": "string",
+          "description": "Exemplary high-bar model response",
+          "maxLength": 10000
+        },
+        "followUpQuestion": {
+          "type": "string",
+          "description": "Probing follow-up question based on answer",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Question creation timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Question last evaluation timestamp"
+        }
+      },
+      "required": ["questionId", "interviewId", "userId", "order", "questionText", "status", "createdAt", "updatedAt"]
+    },
+    "SavedFeedback": {
+      "title": "SavedFeedback",
+      "description": "Candidate bookmarked key questions, model answers, and coaching insights",
+      "type": "object",
+      "properties": {
+        "feedbackId": {
+          "type": "string",
+          "description": "Unique ID of saved note",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner candidate UID",
+          "maxLength": 128
+        },
+        "interviewId": {
+          "type": "string",
+          "description": "Originating interview session ID",
+          "maxLength": 128
+        },
+        "questionText": {
+          "type": "string",
+          "description": "Question snippet",
+          "maxLength": 1000
+        },
+        "domain": {
+          "type": "string",
+          "description": "Industry domain",
+          "maxLength": 64
+        },
+        "keyTakeaway": {
+          "type": "string",
+          "description": "Coaching insight to remember",
+          "maxLength": 3000
+        },
+        "modelAnswer": {
+          "type": "string",
+          "description": "Reference model answer",
+          "maxLength": 8000
+        },
+        "category": {
+          "type": "string",
+          "description": "Competency tag",
+          "maxLength": 100
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Saved timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Update timestamp"
+        }
+      },
+      "required": ["feedbackId", "userId", "questionText", "keyTakeaway", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile and interview history metrics"
+    },
+    "/interviews/{interviewId}": {
+      "schema": "InterviewSession",
+      "description": "Mock interview sessions conducted by the user"
+    },
+    "/interviews/{interviewId}/questions/{questionId}": {
+      "schema": "InterviewQuestion",
+      "description": "Individual questions, candidate answers, and rubric evaluations for a session"
+    },
+    "/saved_feedback/{feedbackId}": {
+      "schema": "SavedFeedback",
+      "description": "Candidate bookmarked interview insights and model answers"
+    }
+  }
+}
